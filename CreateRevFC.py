@@ -18,8 +18,20 @@ def find_revs(fc):
     return revs
 
 
-def create_feature_class(revs):
+def rev_feature_classes(onv_layer, rev_nums):
     """ Creates feature classes for each rev and saves to a geodatabase """
 
-    arcpy.AddMessage("Here are the revs from CreateRevFeatureClass: " + str(revs))
+    arcpy.AddMessage("Here are the revs from CreateRevFeatureClass: " + str(rev_nums))
+    revs = list(rev_nums[1:-1].split(", "))
+
+    # Select each set of features
+    for rev in list(revs):
+
+        selection = f"\"rev_num\" = {rev}"
+        output_name = "C:\\Users\\ca003927\\OneDrive - Maxar Technologies Holdings Inc\\Private Drop\\Git\\Clear_Sky_Insight\\CSI_GeoDatabase.gdb\\rev_" + rev
+
+        arcpy.AddMessage("Current rev: " + rev)
+        arcpy.conversion.ExportFeatures(onv_layer, 
+                                        output_name,
+                                        selection)
 
