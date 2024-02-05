@@ -34,4 +34,12 @@ def rev_feature_classes(onv_layer, rev_nums):
         arcpy.conversion.ExportFeatures(onv_layer, 
                                         output_name,
                                         selection)
+        
+def export(layer, location, name, identifier):
+    """ Exports the given layer to the given location with the given identifier appended to the given name """
+
+    output_name = str(name) + "_" + str(identifier)
+    location = str(location)
+    arcpy.AddMessage(location + output_name)
+    arcpy.conversion.ExportFeatures(layer, location + output_name)
 
