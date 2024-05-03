@@ -73,18 +73,15 @@ def run(prod, onv, rev):
     # Create a feature to polygon layer
     arcpy.management.FeatureToPolygon(geodatabase_path + "\PROD_" + rev, geodatabase_path + "\FtP_" + rev, None, "ATTRIBUTES", None)
 
-    # Create a spatial join layer
+    #Create a spatial join layer
     arcpy.analysis.SpatialJoin(geodatabase_path + "\FtP_" + rev, 
                                geodatabase_path + "\PROD_" + rev, 
                                geodatabase_path + "\SJ_" + rev, 
                                "JOIN_ONE_TO_ONE", 
                                "KEEP_ALL", 
-                               'PricePerArea "PricePerArea" true true false 255 Long 0 0,Sum,#,FtP_75898,price_per_area,-1,-1', 
-                               "INTERSECT", 
+                               'FID_PROD_76429 "FID_PROD_76429" true true false 4 Long 0 0,First,#,PROD_76429,tasking_priority,-1,-1;tasking_priority "tasking_priority" true true false 8 Double 0 0,Sum,#,PROD_76429,tasking_priority,-1,-1;', "HAVE_THEIR_CENTER_IN", 
                                None, 
                                '')
-
-
 
     # weather_output_location = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_Subdivide.gdb\clipped_weather" + "_" + rev + ".tif"
     # arcpy.AddMessage(weather_output_location)
