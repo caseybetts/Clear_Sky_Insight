@@ -65,7 +65,7 @@ def create_order_layers(prod, onv, rev):
     prod_layer = "CSI_" + rev + "_PROD"
 
     # Add a field to the prod layer and calculate the CSI value
-    arcpy.management.CalculateField(prod_layer, "CSI_Value", "100-(!tasking_priority!-700)", "PYTHON3", '', "LONG", "NO_ENFORCE_DOMAINS")
+    arcpy.management.CalculateField(prod_layer, "CSI_Value", "(100-(!tasking_priority!-700))**1.5", "PYTHON3", '', "LONG", "NO_ENFORCE_DOMAINS")
     
     # Create an overlay of strip sized polygons
     create_strip_overlay(prod_layer, "CSI_" + rev + "_strips")
@@ -89,11 +89,12 @@ def create_order_layers(prod, onv, rev):
                                '')
 
 # Create weather shapefile
-def create_cloud_shape(onv, rev):
+def create_cloud_shape(onv, weather, rev):
     """ Creates a shapefile of the areas on a given rev that have cloud cover """
 
     # Clip weather raster to rev
-    arcpy.management.Clip(r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\EWS-Forecasts\ACMFS_2024-01-26T00-18-07-000Z_-PT1M39S.tif\Band_1", 
+    #r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\EWS-Forecasts\ACMFS_2024-01-26T00-18-07-000Z_-PT1M39S.tif\Band_1"
+    arcpy.management.Clip(weather, 
                           "-180 -90 180 90", 
                           "CSI_" + rev + "_weather_raster", 
                           onv, 
@@ -112,8 +113,31 @@ def create_cloud_shape(onv, rev):
                                          "SINGLE_OUTER_PART", 
                                          None)
         
+def add_layers_to_map(layer1):
+    """ Will add the desired layers to the map and symbolize them """
+
+    # Get the active map document and data frame
+    project = arcpy.mp.ArcGISProject("CURRENT")
+    map = project.activeMap
+
+    # Add the feature layer to the map
+    map.addDataFromPath(layer1)
+
+    # l = map.listLayers()[0]
+
+    # # Set the symbology for the layer
+    # sym = l.symbology
+
+    # # Set the symbology properties
+    # sym.colorizer.type == 'RasterClassifyColorizer'
+    # sym.colorizer.classificationField = 'Value'
+    # sym.colorizer.breakCount = 7
+    # sym.colorizer.colorRamp = project.listColorRamps('Cyan to Purple')[0]
+    # l.symbology = sym
+
+
 # Run full series
-def run(prod, onv, rev):
+def run(prod, onv, weather, rev):
     """ Runs all the functions """
 
     # Path to the geodatabase
@@ -123,13 +147,10 @@ def run(prod, onv, rev):
     create_order_layers(prod, onv, rev)
     sj_layer = "CSI_" + rev + "_SJ"
 
-    create_cloud_shape(onv, rev)
+    create_cloud_shape(onv, weather, rev)
     cloud_layer = "CSI_" + rev + "_clouds"
 
-
-
     # Create order layer in clear areas only
-    arcpy.analysis.Erase(sj_layer, cloud_layer, "CSI_" + rev + "_clear_orders", None)
+    add_layers_to_map(arcpy.analysis.Erase(sj_layer, cloud_layer, "CSI_" + rev + "_clear_orders", None))
 
-        
  
