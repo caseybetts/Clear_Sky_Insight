@@ -55,6 +55,57 @@ def weather_over_orders(weather_raster, orders_layer, output_location):
                           "ClippingGeometry", 
                           "NO_MAINTAIN_EXTENT")
 
+# Select available orders
+def select_available_orders(prod, onv, rev):
+    """ Select orders accessable on a given rev based on the order's max ONA vlaue """
+
+    # File names
+    onv_rev = "CSI_" + rev + "_onv"
+
+    # Path to the geodatabase
+    arcpy.env.workspace = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_GeoDatabase.gdb\\"
+   
+    # Select and export the given rev
+    selection = f"\"rev_num\" = {rev} And days = 0"
+    arcpy.conversion.ExportFeatures(onv, onv_rev, selection)
+
+    # Definition query
+    onv_query_1 = "ona = 45"
+    onv_query_2 = "ona = 30"
+    onv_query_3 = "ona = 20"
+
+    # Create an onv feature layer using query 1 
+    feature_layer = arcpy.management.MakeFeatureLayer(onv_rev, "FeatureLayer", onv_query_1)
+    arcpy.AddMessage("Created feature layer from " + onv_rev)
+
+    # Select orders intersecting the current onv feature layer
+    arcpy.management.SelectLayerByLocation(prod, "INTERSECT", feature_layer, None, "ADD_TO_SELECTION",)
+
+    # Deselect orders with ONA under 31
+    arcpy.management.SelectLayerByAttribute(prod, "REMOVE_FROM_SELECTION", "max_ona < 31", None)
+
+    # Create an onv feature layer using query 2
+    feature_layer = arcpy.management.MakeFeatureLayer(onv_rev, "FeatureLayer", onv_query_2)
+    arcpy.AddMessage("Created feature layer from " + onv_rev)
+    
+    # Select order intersecting the current onv feature layer
+    arcpy.management.SelectLayerByLocation(prod, "INTERSECT", feature_layer, None, "ADD_TO_SELECTION",)
+
+    # Export featuer layer
+    # arcpy.conversion.ExportFeatures(feature_layer, "CSI_" + rev + "current_featuer_layer")
+
+    # Deselect orders with ONA under 21
+    arcpy.management.SelectLayerByAttribute(prod, "REMOVE_FROM_SELECTION", "max_ona < 21", None)
+
+    # Create an onv feature layer using query 3
+    feature_layer = arcpy.management.MakeFeatureLayer(onv_rev, "FeatureLayer", onv_query_3)
+    arcpy.AddMessage("Created feature layer from " + onv_rev)
+    
+    # Select order intersecting the current onv feature layer
+    arcpy.management.SelectLayerByLocation(prod, "INTERSECT", feature_layer, None, "ADD_TO_SELECTION",)
+
+    arcpy.conversion.ExportFeatures(prod, "CSI_" + rev + "_prod")
+    
 # Create order layers
 def create_order_layers(prod, onv, rev):
     """ Creates the Base order layer, the feature_to_polygon layer, and the spatial join layer """
