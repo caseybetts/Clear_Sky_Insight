@@ -12,22 +12,6 @@ def ms_export(layer, location, name):
     arcpy.AddMessage("Output file name: " + out_file)
     arcpy.management.MultipartToSinglepart(layer, out_file)
 
-#  Select orders intersecting a given rev 
-def select_orders_by_rev(orders_layer, onv_layer, rev):
-    """ Creates a .gdb layer containing all orders intersecting a given rev """
-
-    # Select the rev in the ONV file
-    selection = f"\"rev_num\" = {rev}"
-    arcpy.management.SelectLayerByAttribute(onv_layer, 'NEW_SELECTION', selection)
-
-    # Select the orders intersecting the ONV selection 
-    arcpy.management.SelectLayerByLocation(orders_layer, 
-                                            "INTERSECT", 
-                                            onv_layer, 
-                                            None, 
-                                            "NEW_SELECTION", 
-                                            "NOT_INVERT")
-
 # Create a strip overlay of the order layer with Grid Index Features
 def create_strip_overlay(orders_layer, rev):
     """ Creates a .gdb layer containing a strip overlay of the given layer """
@@ -56,15 +40,12 @@ def weather_over_orders(weather_raster, orders_layer, output_location):
                           "NO_MAINTAIN_EXTENT")
 
 # Select available orders
-def select_available_orders(prod, onv, rev):
+def select_available_orders(prod, onv, rev, respect_ona = True):
     """ Select orders accessable on a given rev based on the order's max ONA vlaue """
 
     # File names
     onv_rev = "CSI_" + rev + "_onv"
 
-    # Path to the geodatabase
-    arcpy.env.workspace = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_GeoDatabase.gdb\\"
-   
     # Definition query values
     onv_values = [35, 30, 25, 20, 15]
 
@@ -75,23 +56,26 @@ def select_available_orders(prod, onv, rev):
     # Select orders intersecting the 45deg segments of the rev (max selection)
     arcpy.management.SelectLayerByLocation(prod, "INTERSECT", onv_rev, None, "NEW_SELECTION")
 
-    for ona in onv_values:
+    # Only include orders that are avaialble based on their max ONA value
+    if respect_ona:
 
-        # Deselect orders with ONA under current value
-        arcpy.management.SelectLayerByAttribute(prod, "REMOVE_FROM_SELECTION", "max_ona < " + str(ona + 1), None)
+        for ona in onv_values:
 
-        # Create an onv feature
-        feature_layer = arcpy.management.MakeFeatureLayer(onv_rev, "FeatureLayer", f"ona = {ona}")
+            # Deselect orders with ONA under current value
+            arcpy.management.SelectLayerByAttribute(prod, "REMOVE_FROM_SELECTION", "max_ona < " + str(ona + 1), None)
 
-        # Select orders intersecting the current onv feature layer
-        arcpy.management.SelectLayerByLocation(prod, "INTERSECT", feature_layer, None, "ADD_TO_SELECTION")
+            # Create an onv feature
+            feature_layer = arcpy.management.MakeFeatureLayer(onv_rev, "FeatureLayer", f"ona = {ona}")
 
-    # Export the final selection of the orders layer
-    arcpy.conversion.ExportFeatures(prod, "CSI_" + rev + "_prod")
+            # Select orders intersecting the current onv feature layer
+            arcpy.management.SelectLayerByLocation(prod, "INTERSECT", feature_layer, None, "ADD_TO_SELECTION")
+
 
 # Create order layers
 def create_order_layers(prod, onv, rev):
     """ Creates the Base order layer, the feature_to_polygon layer, and the spatial join layer """
+
+    arcpy.AddMessage("Running create_order_layers")
 
     # Layer names
     prod_layer = "CSI_" + rev + "_PROD"
@@ -99,7 +83,7 @@ def create_order_layers(prod, onv, rev):
     spatial_join_layer = "CSI_" + rev + "_SJ"
 
     # Select the orders under the rev
-    select_orders_by_rev(prod, onv, rev)
+    select_available_orders(prod, onv, rev)
     
     # Export the order layer (strip overlay does not seem to work without an exported feature)
     arcpy.management.MultipartToSinglepart(prod, prod_layer)
@@ -124,6 +108,8 @@ def create_order_layers(prod, onv, rev):
                                'FID_PROD_76429 "FID_PROD_76429" true true false 4 Long 0 0,First,#,PROD_76429,CSI_Value,-1,-1;CSI_Value "CSI_Value" true true false 8 Double 0 0,Sum,#,PROD_76429,CSI_Value,-1,-1;', "HAVE_THEIR_CENTER_IN", 
                                None, 
                                '')
+    
+    arcpy.AddMessage("Completing create_order_layers")
     
     return spatial_join_layer
 
@@ -255,7 +241,12 @@ def collection_metrix(inventory, weather, rev):
 # Function to be called by the Clear Order Value tool
 def run(prod, onv, weather, rev):
     """ This function controls what is run by the tool """
-    pass
+    
+    # Path to the geodatabase
+    arcpy.env.workspace = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_GeoDatabase.gdb\\"
+
+
+    create_order_layers(prod, onv, rev)
 
 
 
