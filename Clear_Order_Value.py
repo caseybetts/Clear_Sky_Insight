@@ -40,11 +40,14 @@ def weather_over_orders(weather_raster, orders_layer, output_location):
                           "NO_MAINTAIN_EXTENT")
 
 # Select available orders
-def select_available_orders(prod, onv, rev, respect_ona = True):
+def available_orders(prod, onv, rev, respect_ona = True):
     """ Select orders accessable on a given rev based on the order's max ONA vlaue """
+
+    arcpy.AddMessage("Running select_available_orders.....")
 
     # File names
     onv_rev = "CSI_" + rev + "_onv"
+    prod_layer = "CSI_" + rev + "_PROD"
 
     # Definition query values
     onv_values = [35, 30, 25, 20, 15]
@@ -70,30 +73,31 @@ def select_available_orders(prod, onv, rev, respect_ona = True):
             # Select orders intersecting the current onv feature layer
             arcpy.management.SelectLayerByLocation(prod, "INTERSECT", feature_layer, None, "ADD_TO_SELECTION")
 
+    # Export the order layer (strip overlay does not seem to work without an exported feature)
+    arcpy.management.MultipartToSinglepart(prod, prod_layer)
+
+    arcpy.AddMessage("\b Done")
+
+    return prod_layer
 
 # Create order layers
 def create_order_layers(prod, onv, rev):
     """ Creates the Base order layer, the feature_to_polygon layer, and the spatial join layer """
 
-    arcpy.AddMessage("Running create_order_layers")
+    arcpy.AddMessage("Running create_order_layers.....")
 
     # Layer names
-    prod_layer = "CSI_" + rev + "_PROD"
     FtP_layer = "CSI_" + rev + "_FtP"
     spatial_join_layer = "CSI_" + rev + "_SJ"
 
-    # Select the orders under the rev
-    select_available_orders(prod, onv, rev)
-    
-    # Export the order layer (strip overlay does not seem to work without an exported feature)
-    arcpy.management.MultipartToSinglepart(prod, prod_layer)
-    
+    # Create feature class of available orders under the rev and get the name of that file
+    order_layer = available_orders(prod, onv, rev)    
 
-    # Add a field to the prod layer and calculate the CSI value
-    arcpy.management.CalculateField(prod_layer, "CSI_Value", "(100-(!tasking_priority!-700))**1.5", "PYTHON3", '', "LONG", "NO_ENFORCE_DOMAINS")
+    # Add a field to the order layer and calculate the CSI value
+    arcpy.management.CalculateField(order_layer, "CSI_Value", "(100-(!tasking_priority!-700))**1.5", "PYTHON3", '', "LONG", "NO_ENFORCE_DOMAINS")
     
     # Create a feature to polygon layer
-    arcpy.management.FeatureToPolygon(prod_layer, 
+    arcpy.management.FeatureToPolygon(order_layer, 
                                       FtP_layer, 
                                       None, 
                                       "ATTRIBUTES", 
@@ -101,7 +105,7 @@ def create_order_layers(prod, onv, rev):
 
     # Create a spatial join layer to combine overlaping polygons into one and sum the CSI_value
     arcpy.analysis.SpatialJoin(FtP_layer, 
-                               prod_layer, 
+                               order_layer, 
                                spatial_join_layer, 
                                "JOIN_ONE_TO_ONE", 
                                "KEEP_ALL", 
@@ -109,13 +113,15 @@ def create_order_layers(prod, onv, rev):
                                None, 
                                '')
     
-    arcpy.AddMessage("Completing create_order_layers")
+    arcpy.AddMessage("\b Done")
     
     return spatial_join_layer
 
 # Create weather shapefile
 def create_cloud_shape(onv, weather, rev):
     """ Creates a shapefile of the areas on a given rev that have cloud cover """
+
+    arcpy.AddMessage("Running create_cloud_shape.....")
 
     # Layer name
     rev_raster = "CSI_" + rev + "_weather_raster"
@@ -141,10 +147,14 @@ def create_cloud_shape(onv, weather, rev):
                                          "SINGLE_OUTER_PART", 
                                          None)
         
+    arcpy.AddMessage("\b Done")
+        
     return rev_clouds
         
 def add_layers_to_map(layer1):
     """ Will add the desired layers to the map and symbolize them """
+
+    arcpy.AddMessage("Running add_layers_to_map.....")
 
     # Get the active map document and data frame
     project = arcpy.mp.ArcGISProject("CURRENT")
@@ -167,9 +177,13 @@ def add_layers_to_map(layer1):
     # Apply the symbology to the target layer
     clear_orders.symbology = source_layer.symbology
 
+    arcpy.AddMessage("\b Done")
+
 # Create feature classes for orders, weather and strips
 def create_feature_classes(prod, onv, weather, rev):
     """ Runs all the functions needed to produce the feature classes"""
+
+    arcpy.AddMessage("Running create_feature_classes.....")
 
     # Path to the geodatabase
     arcpy.env.workspace = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_GeoDatabase.gdb\\"
@@ -178,7 +192,7 @@ def create_feature_classes(prod, onv, weather, rev):
     sj_layer = create_order_layers(prod, onv, rev)
 
     # Create cloud shape
-    cloud_layer = create_cloud_shape(onv, weather, rev)
+    cloud_layer = create_cloud_shape("CSI_" + rev + "_onv", weather, rev)
      
     # Create order layer in clear areas only
     add_layers_to_map(arcpy.analysis.Erase(sj_layer, cloud_layer, "CSI_" + rev + "_clear_orders", None))
@@ -186,9 +200,13 @@ def create_feature_classes(prod, onv, weather, rev):
     # Create an overlay of strip sized polygons
     strip_layer = create_strip_overlay("CSI_" + rev + "_clear_orders", rev)
 
+    arcpy.AddMessage("\b Done")
+
 # Count clear collects
 def collection_metrix(inventory, weather, rev):
     """ Return a dictionary of values based on the inventory layer for a given rev """
+
+    arcpy.AddMessage("collection_metrix.....")
 
     # Path to the geodatabase
     arcpy.env.workspace = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_GeoDatabase.gdb\\"
@@ -216,8 +234,6 @@ def collection_metrix(inventory, weather, rev):
         # Count the number of selected rows
         cloudy_count = sum(1 for _ in cursor)
 
-    arcpy.AddMessage("Number of clear collects: " + str(clear_count))
-    arcpy.AddMessage("Number of cloudy collects: " + str(cloudy_count))
 
     # Clip weather raster to rev
     arcpy.management.Clip(weather, 
@@ -236,17 +252,23 @@ def collection_metrix(inventory, weather, rev):
                                          "Value", 
                                          "SINGLE_OUTER_PART", 
                                          None)
-
+        
+    arcpy.AddMessage("\b Done") 
+        
+    return {"Number of clear collects: ": str(clear_count), 
+            "Number of cloudy collects: ": str(cloudy_count)}
 
 # Function to be called by the Clear Order Value tool
-def run(prod, onv, weather, rev):
+def run(prod, onv, weather, inventory, rev):
     """ This function controls what is run by the tool """
     
     # Path to the geodatabase
     arcpy.env.workspace = r"C:\Users\ca003927\OneDrive - Maxar Technologies Holdings Inc\Private Drop\Git\Clear_Sky_Insight\CSI_GeoDatabase.gdb\\"
 
+    # Create all the layers and add to the geodatabase
+    create_feature_classes(prod, onv, weather, rev)
 
-    create_order_layers(prod, onv, rev)
+    arcpy.AddMessage( collection_metrix(inventory, weather, rev) )
 
 
 
